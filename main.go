@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"os"
 
+	tip "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	boardutils "github.com/dylanfeehan/ghess/pkg/board"
 )
 
 type model struct {
-	choices  []string         // items on the to-do list
-	cursor   int              // which to-do list item our cursor is pointing at
-	selected map[int]struct{} // which to-do items are selected
+	board     boardutils.Board
+	textInput tip.Model
+	err       error
+	player    int
+	//cursor   int              // which to-do list item our cursor is pointing at
+	//selected map[int]struct{} // which to-do items are selected
 }
 
 func main() {
@@ -20,22 +25,24 @@ func main() {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
-
-	fmt.Println("vim-go")
-
+	fmt.Println("ghess donezo")
 }
 
 func initialModel() model {
+	board := boardutils.Board{}
+	textInput := tip.New()
+	// in the future, Placeholder = if helpEnabled getSmartMove() else random
+	textInput.Placeholder = "c5Nxf7#"
+	textInput.Focus()
+	textInput.CharLimit = 10
+	textInput.Width = 20
 	return model{
-		// Our to-do list is a grocery list
-		choices: []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
-
-		// A map which indicates which choices are selected. We're using
-		// the  map like a mathematical set. The keys refer to the indexes
-		// of the `choices` slice, above.
-		selected: make(map[int]struct{}),
+		board:     board.Init(),
+		textInput: textInput,
+		player:    boardutils.WHITE,
 	}
 }
+
 func (m model) Init() tea.Cmd {
 	// Just return `nil`, which means "no I/O right now, please."
 	return nil
@@ -53,61 +60,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// These keys should exit the program.
 		case "ctrl+c", "q":
 			return m, tea.Quit
-
-		// The "up" and "k" keys move the cursor up
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		// The "down" and "j" keys move the cursor down
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-
-		// The "enter" key and the spacebar (a literal space) toggle
-		// the selected state for the item that the cursor is pointing at.
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
 		}
+		switch msg.Type {
+
+		case tea.KeyEnter:
+			move := m.textInput.Value()
+			ok := m.board.ExecuteMove(move)
+			if ok {
+				m.player = flip(m.player)
+			}
+			m.textInput.Reset()
+		}
+	case error:
+		m.err = msg
+		fmt.Println(msg)
+		return m, nil
 	}
+
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
 
 	// Return the updated model to the Bubble Tea runtime for processing.
 	// Note that we're not returning a command.
-	return m, nil
+	return m, cmd
 }
+
 func (m model) View() string {
-	// The header
-	s := "What should we buy at the market?\n\n"
-
-	// Iterate over our choices
-	for i, choice := range m.choices {
-
-		// Is the cursor pointing at this choice?
-		cursor := " " // no cursor
-		if m.cursor == i {
-			cursor = ">" // cursor!
-		}
-
-		// Is this choice selected?
-		checked := " " // not selected
-		if _, ok := m.selected[i]; ok {
-			checked = "x" // selected!
-		}
-
-		// Render the row
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
-	}
-
-	// The footer
-	s += "\nPress q to quit.\n"
-
-	// Send the UI for rendering
+	// Define chess piece and board styles
+	//whitePiece := lipgloss.NewStyle().Foreground(lipgloss.Color("231")).Background(lipgloss.Color("242"))
+	//blackPiece := lipgloss.NewStyle().Foreground(lipgloss.Color("232")).Background(lipgloss.Color("136"))
+	s := ""
+	s += m.board.Render(m.player)
+	s += m.textInput.View()
 	return s
+}
+
+func flip(player int) int {
+	if player == boardutils.WHITE {
+		return boardutils.BLACK
+	} else {
+		return boardutils.WHITE
+	}
 }
