@@ -65,7 +65,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			move := m.textInput.Value()
-			ok := m.board.ExecuteMove(move)
+			ok := m.board.ExecuteMove(move, m.player)
 			if ok {
 				m.player = flip(m.player)
 			}

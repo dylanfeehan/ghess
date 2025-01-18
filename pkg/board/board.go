@@ -1,47 +1,22 @@
 package board
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
 	nt "github.com/dylanfeehan/ghess/pkg/notation"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
-type Square struct {
-	Rank int
-	File int
-}
+type Board [][]*Piece
 
 type Piece struct {
 	Color int
 	Type  int
 }
 
-type Board [][]*Piece
-
-func (p *Piece) Text() string {
-	if p == nil {
-		return " "
-	}
-	if p.Color == WHITE {
-		return whitePieces[p.Type]
-	} else {
-		return blackPieces[p.Type]
-	}
-}
-
-func (p *Piece) Style() lipgloss.Style {
-	if p == nil {
-		return lipgloss.NewStyle() // we'll see if blank style will render properly
-	}
-	if p.Color == WHITE {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("231"))
-	} else {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("232"))
-	}
+type Square struct {
+	Rank int
+	File int
 }
 
 func (b Board) Color(x, y int) int {
@@ -49,14 +24,6 @@ func (b Board) Color(x, y int) int {
 		return WHITE
 	}
 	return BLACK
-}
-
-func (b Board) SquareStyle(x, y int) lipgloss.Style {
-	if b.Color(x, y) == WHITE {
-		return lipgloss.NewStyle().Background(lipgloss.Color("#ff6eff"))
-	} else {
-		return lipgloss.NewStyle().Background(lipgloss.Color("#684fff"))
-	}
 }
 
 func (b Board) Init() Board {
@@ -74,8 +41,6 @@ func (b Board) Init() Board {
 			board[rank][file] = nil
 		}
 	}
-
-	//whitePlayer := true
 
 	// initializes top two rows
 	pieceColor := BLACK
@@ -109,46 +74,11 @@ func (b Board) Init() Board {
 	return board
 }
 
-func (board Board) renderWhite() string {
-	s := ""
-	for i, row := range board {
-		for j, piece := range row {
-			squareStyle := board.SquareStyle(i, j)
-			pieceStyle := piece.Style()
-			s += fmt.Sprint(squareStyle.Render(pieceStyle.Render(" " + piece.Text() + " ")))
-		}
-		s += fmt.Sprintln()
-	}
-	return s
-
-}
-
-func (board Board) renderBlack() string {
-	s := ""
-	for i := 7; i >= 0; i-- {
-		for j := 7; j >= 0; j-- {
-			squareStyle := board.SquareStyle(i, j)
-			piece := board[i][j]
-			pieceStyle := piece.Style()
-			s += fmt.Sprint(squareStyle.Render(pieceStyle.Render(" " + piece.Text() + " ")))
-		}
-		s += fmt.Sprintln()
-	}
-	return s
-}
-
-func (board Board) Render(player int) string {
-	// Render board
-	if player == WHITE {
-		return board.renderWhite()
-	} else {
-		return board.renderBlack()
-	}
-}
-
 // ExecuteMove  takes input to chess notation for a move
 // and returns whether or not the move was executed
-func (board Board) ExecuteMove(mv string) bool {
+
+// the board representation of the board always has white on the bottom. the flipping is just a rendering trick
+func (board Board) ExecuteMove(mv string, player int) bool {
 	move, err := nt.Parse(mv)
 	if err != nil {
 		return false
@@ -158,11 +88,13 @@ func (board Board) ExecuteMove(mv string) bool {
 	fileIdx := getFileIndex(move.File, WHITE)
 	rankIdx := getRankIndex(move.Rank, WHITE)
 
-	sq1, sq2 := board.GetSquaresForMove(piece, fileIdx, rankIdx)
-	if sq1 == nil || sq2 == nil {
+	// find the player which is being moved to the location specified in the notation
+	moveSource := board.GetMoveSource(piece, fileIdx, rankIdx, player)
+
+	if moveSource == nil {
 		return false
 	} else {
-		board.executeMove(*sq1, *sq2)
+		board.executeMove(*moveSource, Square{rankIdx, fileIdx})
 		return true
 	}
 }
@@ -197,20 +129,40 @@ func getRankIndex(rank string, player int) int {
 	}
 }
 
-func (board Board) GetSquaresForMove(piece int, fileIdx int, rankIdx int) (*Square, *Square) {
-	destSquare := &Square{rankIdx, fileIdx}
-	//fmt.Printf("fileIdx = %+v\n", fileIdx)
-	//fmt.Printf("rankIdx = %+v\n", rankIdx)
-	//
-	// missing "If player == pawn" logic
-	//player := WHITE
-	// these +1 and +2 are dependent on the direction of the pawn which depends on the player
-	if board[rankIdx+1][fileIdx] != nil && board[rankIdx+1][fileIdx].Type == PAWN {
-		return &Square{rankIdx + 1, fileIdx}, destSquare
+func (board Board) GetMoveSource(piece, fileIdx, rankIdx, player int) *Square {
+	switch piece {
+	case ROOK:
+		return nil
+	case KNIGHT:
+		return nil
+	case BISHOP:
+		return nil
+	case QUEEN:
+		return nil
+	case KING:
+		return nil
+	case PAWN:
+		return board.getPawnSquares(piece, fileIdx, rankIdx, player)
 	}
-	if board[rankIdx+2][fileIdx] != nil && board[rankIdx+2][fileIdx].Type == PAWN {
-		return &Square{rankIdx + 2, fileIdx}, destSquare
+	return nil
+}
+
+func (board Board) getPawnSquares(piece, file, rank, player int) *Square {
+	// The internal representation of the board has black at the "top", e.g. board[0], so -- is looking backwards for BLACK
+	if player == WHITE {
+		if board[rank+1][file] != nil && board[rank+1][file].Type == PAWN {
+			return &Square{rank + 1, file}
+		}
+		if board[rank+2][file] != nil && board[rank+2][file].Type == PAWN {
+			return &Square{rank + 2, file}
+		}
+	} else {
+		if board[rank-1][file] != nil && board[rank-1][file].Type == PAWN {
+			return &Square{rank - 1, file}
+		}
+		if board[rank-2][file] != nil && board[rank-2][file].Type == PAWN {
+			return &Square{rank - 2, file}
+		}
 	}
-	//fmt.Println("THe result is unforunately nill")
-	return nil, nil
+	return nil
 }
