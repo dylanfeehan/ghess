@@ -14,6 +14,8 @@ type Piece struct {
 	Type  int
 }
 
+var captures []*Piece = []*Piece{}
+
 type Square struct {
 	Rank int
 	File int
@@ -24,9 +26,24 @@ func (b Board) Color(x, y int) int {
 		return WHITE
 	}
 	return BLACK
+
 }
 
-func (b Board) Init() Board {
+func (board Board) Flip() Board {
+	newBoard := emptyBoard()
+	ni := 0
+	for i := 7; i >= 0; i-- {
+		nj := 0
+		for j := 7; j >= 0; j-- {
+			newBoard[ni][nj] = board[i][j]
+			nj++
+		}
+		ni++
+	}
+	return newBoard
+}
+
+func emptyBoard() [][]*Piece {
 	var board [][]*Piece = make([][]*Piece, 8, 8)
 
 	for i := 0; i < 8; i++ {
@@ -41,6 +58,11 @@ func (b Board) Init() Board {
 			board[rank][file] = nil
 		}
 	}
+	return board
+}
+
+func (b Board) Init() Board {
+	var board [][]*Piece = emptyBoard()
 
 	// initializes top two rows
 	pieceColor := BLACK
@@ -57,7 +79,7 @@ func (b Board) Init() Board {
 		}
 	}
 
-	// initializes top two rows
+	// initializes bottom two rows (white always starts)
 	pieceColor = WHITE
 	for rank := 6; rank < 8; rank++ {
 		for file := 0; file < 8; file++ {
@@ -85,11 +107,11 @@ func (board Board) ExecuteMove(mv string, player int) bool {
 	}
 
 	piece := PieceStrToInt(move.Piece)
-	fileIdx := getFileIndex(move.File, WHITE)
-	rankIdx := getRankIndex(move.Rank, WHITE)
+	fileIdx := getFileIndex(move.File, player)
+	rankIdx := getRankIndex(move.Rank, player)
 
 	// find the player which is being moved to the location specified in the notation
-	moveSource := board.GetMoveSource(piece, fileIdx, rankIdx, player)
+	moveSource := board.getMoveSource(piece, fileIdx, rankIdx, player)
 
 	if moveSource == nil {
 		return false
@@ -99,14 +121,7 @@ func (board Board) ExecuteMove(mv string, player int) bool {
 	}
 }
 
-// lots more to do here
-func (board Board) executeMove(sq1 Square, sq2 Square) {
-	srcPiece := board[sq1.Rank][sq1.File]
-
-	board[sq1.Rank][sq1.File] = nil
-	board[sq2.Rank][sq2.File] = srcPiece
-}
-
+// if black says they want to go to a1, that's column 7, row 0
 func getFileIndex(file string, player int) int {
 	fileNum := FileStrToInt(file)
 	if player == WHITE {
@@ -129,7 +144,7 @@ func getRankIndex(rank string, player int) int {
 	}
 }
 
-func (board Board) GetMoveSource(piece, fileIdx, rankIdx, player int) *Square {
+func (board Board) getMoveSource(piece, fileIdx, rankIdx, player int) *Square {
 	switch piece {
 	case ROOK:
 		return nil
@@ -149,20 +164,23 @@ func (board Board) GetMoveSource(piece, fileIdx, rankIdx, player int) *Square {
 
 func (board Board) getPawnSquares(piece, file, rank, player int) *Square {
 	// The internal representation of the board has black at the "top", e.g. board[0], so -- is looking backwards for BLACK
-	if player == WHITE {
-		if board[rank+1][file] != nil && board[rank+1][file].Type == PAWN {
-			return &Square{rank + 1, file}
-		}
-		if board[rank+2][file] != nil && board[rank+2][file].Type == PAWN {
-			return &Square{rank + 2, file}
-		}
-	} else {
-		if board[rank-1][file] != nil && board[rank-1][file].Type == PAWN {
-			return &Square{rank - 1, file}
-		}
-		if board[rank-2][file] != nil && board[rank-2][file].Type == PAWN {
-			return &Square{rank - 2, file}
-		}
+
+	if board[rank+1][file] != nil && board[rank+1][file].Type == PAWN {
+		return &Square{rank + 1, file}
+	}
+	if board[rank+2][file] != nil && board[rank+2][file].Type == PAWN {
+		return &Square{rank + 2, file}
 	}
 	return nil
+}
+
+// lots more to do here
+func (board Board) executeMove(sq1 Square, sq2 Square) {
+	srcPiece := board[sq1.Rank][sq1.File]
+	capturePiece := board[sq2.Rank][sq2.File]
+	if capturePiece != nil {
+		captures = append(captures, capturePiece)
+	}
+	board[sq1.Rank][sq1.File] = nil
+	board[sq2.Rank][sq2.File] = srcPiece
 }

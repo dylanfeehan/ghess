@@ -68,6 +68,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ok := m.board.ExecuteMove(move, m.player)
 			if ok {
 				m.player = flip(m.player)
+				m.board = m.board.Flip()
 			}
 			m.textInput.Reset()
 		}
